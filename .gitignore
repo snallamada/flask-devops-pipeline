@@ -1,0 +1,55 @@
+# ── Python ─────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# ── Virtual environments ────────────────────────────────────────────────────────
+venv/
+env/
+.venv/
+.env/
+ENV/
+
+# ── Environment files ───────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Terraform ──────────────────────────────────────────────────────────────────
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+*.tfplan
+terraform.tfvars.local
+
+# ── Docker ─────────────────────────────────────────────────────────────────────
+*.tar
+image.tar
+
+# ── OS artifacts ───────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# ── IDE / Editor ───────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.iml
+
+# ── Test artifacts ─────────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+pytest-results.xml
+trivy-results.sarif
+
+# ── Kubernetes secrets (never commit real secrets) ─────────────────────────────
+*-secret.yaml
+*-secrets.yaml

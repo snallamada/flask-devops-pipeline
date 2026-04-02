@@ -1,0 +1,5 @@
+flask==3.0.3
+pytest==8.2.2
+requests==2.32.3
+prometheus-flask-exporter==0.23.1
+flake8==7.1.0

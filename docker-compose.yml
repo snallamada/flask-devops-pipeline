@@ -1,0 +1,41 @@
+version: "3.9"
+
+# ── Networks ───────────────────────────────────────────────────────────────────
+networks:
+  flask-network:
+    driver: bridge
+    name: flask-devops-network
+
+# ── Volumes ────────────────────────────────────────────────────────────────────
+volumes:
+  flask-data:
+    driver: local
+
+# ── Services ──────────────────────────────────────────────────────────────────
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: flask-devops-app:latest
+    container_name: flask-devops-web
+    ports:
+      - "5000:5000"
+    environment:
+      - APP_ENV=production
+      - APP_VERSION=1.0.0
+    volumes:
+      - flask-data:/app/data
+    networks:
+      - flask-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "com.example.service=flask-app"
+      - "com.example.version=1.0.0"

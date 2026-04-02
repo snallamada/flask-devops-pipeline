@@ -1,0 +1,35 @@
+global:
+  scrape_interval: 15s        # Scrape every 15 seconds
+  evaluation_interval: 15s    # Evaluate rules every 15 seconds
+  scrape_timeout: 10s
+
+# Alertmanager configuration (optional — uncomment when configured)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ["alertmanager:9093"]
+
+# Rule files (uncomment to load alerting/recording rules)
+# rule_files:
+#   - "alert_rules.yml"
+
+scrape_configs:
+  # ── Prometheus self-monitoring ──────────────────────────────────────────────
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # ── Flask Application ───────────────────────────────────────────────────────
+  - job_name: "flask-app"
+    metrics_path: /metrics
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["web:5000"]
+        labels:
+          service: "flask-devops-app"
+          environment: "production"
+
+  # ── Docker host (via cAdvisor, optional) ────────────────────────────────────
+  # - job_name: "cadvisor"
+  #   static_configs:
+  #     - targets: ["cadvisor:8080"]
