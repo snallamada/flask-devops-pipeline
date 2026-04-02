@@ -45,10 +45,14 @@ Thumbs.db
 
 # ── Test artifacts ─────────────────────────────────────────────────────────────
 .pytest_cache/
+pytest-cache-files-*/
 .coverage
 htmlcov/
 pytest-results.xml
 trivy-results.sarif
+
+# ── Claude Code ────────────────────────────────────────────────────────────────
+.claude/
 
 # ── Kubernetes secrets (never commit real secrets) ─────────────────────────────
 *-secret.yaml

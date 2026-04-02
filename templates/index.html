@@ -1,0 +1,1308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flask DevOps Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0e1a;
+      --surface: #111827;
+      --surface2: #1e293b;
+      --border: #1f2d40;
+      --border2: #334155;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --blue: #38bdf8;
+      --green: #22c55e;
+      --yellow: #f59e0b;
+      --red: #ef4444;
+      --purple: #a78bfa;
+      --orange: #fb923c;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Sidebar ── */
+    .layout { display: flex; min-height: 100vh; }
+
+    .sidebar {
+      width: 220px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 1.5rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      flex-shrink: 0;
+    }
+
+    .sidebar-logo {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--blue);
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      border: none;
+      background: none;
+      width: 100%;
+      text-align: left;
+    }
+    .nav-item:hover { background: var(--surface2); color: var(--text); }
+    .nav-item.active { background: #1e3a5f; color: var(--blue); }
+    .nav-icon { font-size: 1rem; width: 18px; text-align: center; }
+
+    .sidebar-section {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      padding: 1rem 0.75rem 0.4rem;
+    }
+
+    /* ── Main ── */
+    .main { flex: 1; overflow-x: hidden; }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 2rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .topbar-title { font-size: 1.1rem; font-weight: 600; }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      font-size: 0.82rem;
+    }
+
+    .badge {
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      background: var(--surface2);
+      color: var(--muted);
+      border: 1px solid var(--border2);
+      font-size: 0.75rem;
+    }
+    .badge.green { background: #052e16; color: var(--green); border-color: #166534; }
+    .badge.blue  { background: #0c1a35; color: var(--blue);  border-color: #1e3a5f; }
+
+    .refresh-btn {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      background: #1e40af; color: #bfdbfe;
+      border: none; border-radius: 8px;
+      padding: 0.4rem 0.9rem; font-size: 0.82rem;
+      cursor: pointer; transition: background 0.2s;
+    }
+    .refresh-btn:hover { background: #2563eb; }
+
+    /* ── Pages ── */
+    .page { display: none; padding: 2rem; }
+    .page.active { display: block; }
+
+    /* ── Cards ── */
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
+    .span-full { grid-column: 1 / -1; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      transition: border-color 0.2s;
+    }
+    .card:hover { border-color: var(--border2); }
+
+    .card-header {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+
+    .card-title {
+      font-size: 0.82rem; font-weight: 600;
+      color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+
+    .endpoint-tag {
+      font-size: 0.72rem; font-family: monospace;
+      padding: 0.15rem 0.5rem; border-radius: 4px;
+      background: #0f172a; color: var(--blue);
+      border: 1px solid #1e40af;
+    }
+
+    .status-dot {
+      width: 9px; height: 9px; border-radius: 50%;
+      background: var(--border2); display: inline-block;
+      transition: background 0.3s;
+    }
+    .status-dot.ok     { background: var(--green); box-shadow: 0 0 6px #22c55e66; }
+    .status-dot.error  { background: var(--red); }
+    .status-dot.loading { background: var(--yellow); animation: blink 1s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+    .data-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0.4rem 0; border-bottom: 1px solid #0f172a; font-size: 0.88rem;
+    }
+    .data-row:last-child { border-bottom: none; }
+    .data-label { color: var(--muted); }
+    .data-value { color: #f1f5f9; font-family: monospace; }
+    .data-value.ok    { color: var(--green); }
+    .data-value.error { color: var(--red); }
+
+    /* ── Stat tiles ── */
+    .stat-tile {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+    }
+    .stat-label { font-size: 0.78rem; color: var(--muted); margin-bottom: 0.4rem; }
+    .stat-value { font-size: 1.8rem; font-weight: 700; color: #f8fafc; }
+    .stat-sub   { font-size: 0.75rem; color: var(--muted); margin-top: 0.3rem; }
+    .stat-value.green  { color: var(--green); }
+    .stat-value.blue   { color: var(--blue); }
+    .stat-value.yellow { color: var(--yellow); }
+    .stat-value.purple { color: var(--purple); }
+
+    /* ── Metrics ── */
+    .metrics-block {
+      background: #060a14;
+      border-radius: 8px; padding: 0.75rem 1rem;
+      font-family: monospace; font-size: 0.76rem;
+      color: var(--muted); max-height: 300px;
+      overflow-y: auto; line-height: 1.7;
+      white-space: pre-wrap; word-break: break-all;
+      border: 1px solid var(--border);
+    }
+    .metrics-block .m-name    { color: var(--blue); }
+    .metrics-block .m-comment { color: #2d3f52; }
+    .metrics-block .m-value   { color: var(--green); }
+
+    /* ── Request log ── */
+    .log-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .log-table th {
+      text-align: left; padding: 0.5rem 0.75rem;
+      color: var(--muted); font-weight: 600;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .log-table td {
+      padding: 0.45rem 0.75rem;
+      border-bottom: 1px solid #0f172a;
+      font-family: monospace;
+      color: var(--text);
+    }
+    .log-table tr:last-child td { border-bottom: none; }
+    .log-table tr:hover td { background: var(--surface2); }
+    .pill {
+      display: inline-block; padding: 0.1rem 0.45rem;
+      border-radius: 4px; font-size: 0.7rem; font-weight: 600;
+    }
+    .pill.ok    { background:#052e16; color:var(--green); }
+    .pill.error { background:#3b0f0f; color:var(--red); }
+    .pill.post  { background:#1e1b4b; color:var(--purple); }
+    .pill.get   { background:#0c1a35; color:var(--blue); }
+
+    /* ── Latency chart ── */
+    .chart-wrap { position: relative; height: 120px; margin-top: 0.5rem; }
+    canvas { width: 100% !important; height: 120px !important; }
+
+    /* ── Architecture ── */
+    .arch-flow {
+      display: flex; align-items: center;
+      gap: 0; flex-wrap: wrap;
+      margin: 1rem 0;
+    }
+    .arch-box {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 10px;
+      padding: 0.75rem 1.1rem;
+      text-align: center;
+      min-width: 110px;
+    }
+    .arch-box .arch-icon { font-size: 1.4rem; margin-bottom: 0.3rem; }
+    .arch-box .arch-label { font-size: 0.72rem; color: var(--muted); }
+    .arch-box .arch-name  { font-size: 0.85rem; font-weight: 600; color: var(--text); }
+    .arch-arrow {
+      font-size: 1.2rem; color: var(--border2);
+      padding: 0 0.3rem; flex-shrink: 0;
+    }
+
+    /* ── CI/CD Pipeline ── */
+    .pipeline {
+      display: flex; align-items: flex-start;
+      gap: 0; margin: 1rem 0; overflow-x: auto; padding-bottom: 0.5rem;
+    }
+    .pipeline-stage {
+      display: flex; flex-direction: column; align-items: center;
+      min-width: 110px;
+    }
+    .stage-dot {
+      width: 36px; height: 36px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; font-weight: 700;
+      border: 2px solid var(--border2);
+      background: var(--surface2);
+      flex-shrink: 0;
+    }
+    .stage-dot.done    { background:#052e16; border-color:var(--green); color:var(--green); }
+    .stage-dot.running { background:#1c1300; border-color:var(--yellow); color:var(--yellow); animation: blink 1s infinite; }
+    .stage-dot.pending { background:var(--surface2); border-color:var(--border2); color:var(--muted); }
+    .stage-line {
+      flex: 1; height: 2px; background: var(--border);
+      margin-top: 17px; min-width: 30px;
+    }
+    .stage-line.done { background: var(--green); }
+    .stage-name { font-size: 0.72rem; color: var(--muted); margin-top: 0.5rem; text-align: center; }
+    .stage-detail { font-size: 0.65rem; color: var(--border2); text-align: center; margin-top: 0.1rem; }
+
+    /* ── Explanation ── */
+    .explain-block {
+      background: #060a14;
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--blue);
+      border-radius: 0 8px 8px 0;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .explain-block h3 { font-size: 0.9rem; color: var(--blue); margin-bottom: 0.4rem; }
+    .explain-block p  { font-size: 0.83rem; color: #94a3b8; line-height: 1.7; }
+    .explain-block code {
+      background: var(--surface2); color: var(--yellow);
+      padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.8rem;
+    }
+
+    .tag-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+    .tech-tag {
+      padding: 0.2rem 0.6rem; border-radius: 6px;
+      font-size: 0.72rem; font-weight: 600;
+      background: var(--surface2); color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .tech-tag.blue   { background:#0c1a35; color:var(--blue);   border-color:#1e3a5f; }
+    .tech-tag.green  { background:#052e16; color:var(--green);  border-color:#166534; }
+    .tech-tag.purple { background:#1e1040; color:var(--purple); border-color:#4c1d95; }
+    .tech-tag.orange { background:#1c0f00; color:var(--orange); border-color:#92400e; }
+
+    .section-title {
+      font-size: 1rem; font-weight: 700; color: #f8fafc;
+      margin-bottom: 1rem; margin-top: 1.5rem;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .section-title:first-child { margin-top: 0; }
+
+    footer {
+      text-align: center; font-size: 0.75rem;
+      color: var(--border2); padding: 1.5rem;
+      border-top: 1px solid var(--border); margin-top: 2rem;
+    }
+  </style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-logo">&#9881; DevOps</div>
+
+    <div class="sidebar-section">Monitor</div>
+    <button class="nav-item active" onclick="showPage('dashboard', this)">
+      <span class="nav-icon">&#9685;</span> Dashboard
+    </button>
+    <button class="nav-item" onclick="showPage('endpoints', this)">
+      <span class="nav-icon">&#8644;</span> Endpoints
+    </button>
+    <button class="nav-item" onclick="showPage('metrics', this)">
+      <span class="nav-icon">&#128200;</span> Metrics
+    </button>
+    <button class="nav-item" onclick="showPage('logs', this)">
+      <span class="nav-icon">&#128203;</span> Request Log
+    </button>
+
+    <div class="sidebar-section">Tools</div>
+    <button class="nav-item" onclick="showPage('stats', this)">
+      <span class="nav-icon">&#9201;</span> Stats
+    </button>
+    <button class="nav-item" onclick="showPage('env', this)">
+      <span class="nav-icon">&#128196;</span> Env Vars
+    </button>
+    <button class="nav-item" onclick="showPage('echo', this)">
+      <span class="nav-icon">&#8617;</span> Echo Tester
+    </button>
+    <button class="nav-item" onclick="showPage('probes', this)">
+      <span class="nav-icon">&#10084;</span> Probes
+    </button>
+
+    <div class="sidebar-section">Project</div>
+    <button class="nav-item" onclick="showPage('pipeline', this)">
+      <span class="nav-icon">&#9654;</span> CI/CD Pipeline
+    </button>
+    <button class="nav-item" onclick="showPage('architecture', this)">
+      <span class="nav-icon">&#127760;</span> Architecture
+    </button>
+    <button class="nav-item" onclick="showPage('explain', this)">
+      <span class="nav-icon">&#128218;</span> Explanation
+    </button>
+  </nav>
+
+  <!-- Main area -->
+  <div class="main">
+    <div class="topbar">
+      <span class="topbar-title" id="page-title">Dashboard</span>
+      <div class="topbar-right">
+        <span class="badge green" id="env-badge">development</span>
+        <span class="badge blue" id="version-badge">v1.0.0</span>
+        <span id="countdown" style="font-size:0.78rem;color:var(--muted)"></span>
+        <button class="refresh-btn" onclick="fetchAll()">&#8635; Refresh</button>
+      </div>
+    </div>
+
+    <!-- ═══════════ DASHBOARD ═══════════ -->
+    <div class="page active" id="page-dashboard">
+
+      <!-- Stat tiles -->
+      <div class="grid-3" style="margin-bottom:1.25rem">
+        <div class="stat-tile">
+          <div class="stat-label">Overall Status</div>
+          <div class="stat-value green" id="stat-overall">&#9679; Healthy</div>
+          <div class="stat-sub">All endpoints responding</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-label">Avg Latency</div>
+          <div class="stat-value blue" id="stat-latency">— ms</div>
+          <div class="stat-sub">across /health, /, /info</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-label">Total Requests (session)</div>
+          <div class="stat-value purple" id="stat-requests">0</div>
+          <div class="stat-sub">since page load</div>
+        </div>
+      </div>
+
+      <div class="grid">
+
+        <!-- Health -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title"><span class="status-dot loading" id="dot-health"></span>Health Check</span>
+            <span class="endpoint-tag">GET /health</span>
+          </div>
+          <div class="data-row"><span class="data-label">Status</span><span class="data-value" id="health-status">—</span></div>
+          <div class="data-row"><span class="data-label">HTTP Code</span><span class="data-value" id="health-code">—</span></div>
+          <div class="data-row"><span class="data-label">Latency</span><span class="data-value" id="health-latency">—</span></div>
+          <div class="data-row"><span class="data-label">Last checked</span><span class="data-value" id="health-time">—</span></div>
+        </div>
+
+        <!-- Home -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title"><span class="status-dot loading" id="dot-home"></span>Home</span>
+            <span class="endpoint-tag">GET /</span>
+          </div>
+          <div class="data-row"><span class="data-label">Message</span><span class="data-value" id="home-message">—</span></div>
+          <div class="data-row"><span class="data-label">Version</span><span class="data-value" id="home-version">—</span></div>
+          <div class="data-row"><span class="data-label">Environment</span><span class="data-value" id="home-env">—</span></div>
+        </div>
+
+        <!-- Info -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title"><span class="status-dot loading" id="dot-info"></span>Info</span>
+            <span class="endpoint-tag">GET /info</span>
+          </div>
+          <div class="data-row"><span class="data-label">Version</span><span class="data-value" id="info-version">—</span></div>
+          <div class="data-row"><span class="data-label">Hostname</span><span class="data-value" id="info-hostname">—</span></div>
+          <div class="data-row"><span class="data-label">Environment</span><span class="data-value" id="info-env">—</span></div>
+        </div>
+
+        <!-- Latency chart -->
+        <div class="card span-full">
+          <div class="card-header">
+            <span class="card-title">&#9650; Latency History</span>
+            <span style="font-size:0.75rem;color:var(--muted)">last 20 refreshes · /health</span>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="latencyChart"></canvas>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ═══════════ ENDPOINTS ═══════════ -->
+    <div class="page" id="page-endpoints">
+      <div class="section-title">&#8644; All Endpoints</div>
+
+      <div class="grid">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title"><span class="status-dot loading" id="dot2-health"></span>Health</span>
+            <span class="endpoint-tag">GET /health</span>
+          </div>
+          <div class="data-row"><span class="data-label">status</span><span class="data-value" id="ep-health-status">—</span></div>
+          <div class="data-row"><span class="data-label">HTTP</span><span class="data-value" id="ep-health-code">—</span></div>
+          <div class="data-row"><span class="data-label">Latency</span><span class="data-value" id="ep-health-ms">—</span></div>
+          <div style="margin-top:0.75rem;font-size:0.78rem;color:var(--muted);line-height:1.6">
+            Used as a <strong style="color:var(--text)">liveness probe</strong> by Docker HEALTHCHECK and Kubernetes.
+            Returns <code style="background:var(--surface2);color:var(--yellow);padding:0 4px;border-radius:3px">{"status":"ok"}</code> when the app is up.
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title"><span class="status-dot loading" id="dot2-home"></span>Home</span>
+            <span class="endpoint-tag">GET /</span>
+          </div>
+          <div class="data-row"><span class="data-label">message</span><span class="data-value" id="ep-home-msg">—</span></div>
+          <div class="data-row"><span class="data-label">version</span><span class="data-value" id="ep-home-ver">—</span></div>
+          <div class="data-row"><span class="data-label">environment</span><span class="data-value" id="ep-home-env">—</span></div>
+          <div style="margin-top:0.75rem;font-size:0.78rem;color:var(--muted);line-height:1.6">
+            Root route — returns app identity. Version and environment are injected via
+            <strong style="color:var(--text)">environment variables</strong> <code style="background:var(--surface2);color:var(--yellow);padding:0 4px;border-radius:3px">APP_VERSION</code> /
+            <code style="background:var(--surface2);color:var(--yellow);padding:0 4px;border-radius:3px">APP_ENV</code>.
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title"><span class="status-dot loading" id="dot2-info"></span>Info</span>
+            <span class="endpoint-tag">GET /info</span>
+          </div>
+          <div class="data-row"><span class="data-label">version</span><span class="data-value" id="ep-info-ver">—</span></div>
+          <div class="data-row"><span class="data-label">hostname</span><span class="data-value" id="ep-info-host">—</span></div>
+          <div class="data-row"><span class="data-label">environment</span><span class="data-value" id="ep-info-env">—</span></div>
+          <div style="margin-top:0.75rem;font-size:0.78rem;color:var(--muted);line-height:1.6">
+            Returns the <strong style="color:var(--text)">hostname</strong> of the container or machine running the app.
+            Useful for identifying which pod is serving a request in Kubernetes.
+          </div>
+        </div>
+
+        <div class="card span-full">
+          <div class="card-header">
+            <span class="card-title"><span class="status-dot loading" id="dot2-metrics"></span>Prometheus Metrics</span>
+            <span class="endpoint-tag">GET /metrics</span>
+          </div>
+          <div style="font-size:0.78rem;color:var(--muted);line-height:1.6;margin-bottom:0.75rem">
+            Auto-instrumented by <strong style="color:var(--text)">prometheus-flask-exporter</strong>.
+            Prometheus scrapes this endpoint every 15s. Grafana visualises it. No manual metric code needed.
+          </div>
+          <div class="metrics-block" id="ep-metrics">Loading...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ METRICS ═══════════ -->
+    <div class="page" id="page-metrics">
+      <div class="section-title">&#128200; Prometheus Metrics</div>
+
+      <div class="grid-2" style="margin-bottom:1.25rem">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Request Count by Endpoint</span></div>
+          <div id="req-count-list" style="font-size:0.82rem">Loading...</div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Process Info</span></div>
+          <div id="proc-info-list" style="font-size:0.82rem">Loading...</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Raw Prometheus Output</span>
+          <span class="endpoint-tag">GET /metrics</span>
+        </div>
+        <div class="metrics-block" id="metrics-raw">Loading...</div>
+      </div>
+    </div>
+
+    <!-- ═══════════ REQUEST LOG ═══════════ -->
+    <div class="page" id="page-logs">
+      <div class="section-title">&#128203; Request Log <span style="font-size:0.75rem;color:var(--muted);font-weight:400">(this session)</span></div>
+      <div class="card">
+        <table class="log-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Time</th>
+              <th>Method</th>
+              <th>Endpoint</th>
+              <th>HTTP</th>
+              <th>Latency</th>
+              <th>Result</th>
+            </tr>
+          </thead>
+          <tbody id="log-body">
+            <tr><td colspan="7" style="color:var(--muted);text-align:center;padding:1.5rem">No requests yet — hit Refresh</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ═══════════ STATS ═══════════ -->
+    <div class="page" id="page-stats">
+      <div class="section-title">&#9201; Runtime Stats <span style="font-size:0.75rem;color:var(--muted);font-weight:400">— GET /api/stats</span></div>
+
+      <div class="grid-3" style="margin-bottom:1.25rem">
+        <div class="stat-tile">
+          <div class="stat-label">Uptime</div>
+          <div class="stat-value green" id="stat-uptime-human">—</div>
+          <div class="stat-sub" id="stat-start-time">started: —</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-label">Requests Served</div>
+          <div class="stat-value blue" id="stat-reqs-total">—</div>
+          <div class="stat-sub">since server start</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-label">Python Version</div>
+          <div class="stat-value purple" id="stat-python">—</div>
+          <div class="stat-sub" id="stat-hostname-tile">host: —</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Full /api/stats Response</span>
+          <button class="refresh-btn" onclick="fetchStats()">&#8635; Refresh</button>
+        </div>
+        <div id="stats-rows"></div>
+      </div>
+
+      <div class="explain-block" style="margin-top:1.25rem">
+        <h3>What is this endpoint?</h3>
+        <p><code>/api/stats</code> is a custom runtime endpoint that exposes live server-side data: how long the app has been running, how many requests it has handled (tracked with a simple in-memory counter via <code>@app.before_request</code>), the hostname, Python version, and environment. Useful for observability without needing Prometheus.</p>
+      </div>
+    </div>
+
+    <!-- ═══════════ ENV VARS ═══════════ -->
+    <div class="page" id="page-env">
+      <div class="section-title">&#128196; Environment Variables <span style="font-size:0.75rem;color:var(--muted);font-weight:400">— GET /api/env</span></div>
+
+      <div class="card" style="margin-bottom:1.25rem">
+        <div class="card-header">
+          <span class="card-title">Safe Environment Variables</span>
+          <span class="badge blue" id="env-count-badge">0 vars</span>
+        </div>
+        <div id="env-rows" style="font-size:0.85rem">Loading...</div>
+      </div>
+
+      <div class="explain-block">
+        <h3>What is this endpoint?</h3>
+        <p><code>/api/env</code> returns environment variables filtered to safe prefixes only (<code>APP_</code>, <code>FLASK_</code>, <code>HOSTNAME</code>, <code>PATH</code>, etc.). Secret keys, database URLs, and tokens are never exposed. This is how Kubernetes <strong>ConfigMaps</strong> and <strong>environment-based config</strong> are typically inspected at runtime — you can see exactly what the running container sees without SSHing into it.</p>
+      </div>
+    </div>
+
+    <!-- ═══════════ ECHO TESTER ═══════════ -->
+    <div class="page" id="page-echo">
+      <div class="section-title">&#8617; Echo Tester <span style="font-size:0.75rem;color:var(--muted);font-weight:400">— POST /api/echo</span></div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Send JSON Payload</span></div>
+          <textarea id="echo-input" style="
+            width:100%; height:160px; background:#060a14; color:#e2e8f0;
+            border:1px solid var(--border2); border-radius:8px; padding:0.75rem;
+            font-family:monospace; font-size:0.82rem; resize:vertical; outline:none;
+          ">{
+  "message": "hello",
+  "value": 42,
+  "tags": ["devops", "flask"]
+}</textarea>
+          <div style="display:flex;gap:0.75rem;margin-top:0.75rem;align-items:center">
+            <button class="refresh-btn" onclick="sendEcho()" style="background:#166534;color:#bbf7d0">&#9654; Send POST</button>
+            <button class="refresh-btn" onclick="resetEcho()" style="background:#1e293b;color:#94a3b8">&#10006; Clear</button>
+            <span id="echo-status" style="font-size:0.78rem;color:var(--muted)"></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><span class="card-title">Response</span></div>
+          <div id="echo-response" class="metrics-block" style="height:200px;display:flex;align-items:center;justify-content:center;color:var(--muted)">
+            Send a payload to see the echo response
+          </div>
+        </div>
+      </div>
+
+      <div class="explain-block" style="margin-top:1.25rem">
+        <h3>What is this endpoint?</h3>
+        <p><code>POST /api/echo</code> accepts any JSON body and echoes it back with metadata: timestamp, content-type, and method. It's useful for testing that your HTTP client, proxy, or ingress is forwarding request bodies correctly. In a real pipeline you might use this to verify that a webhook payload survives transit through an API gateway unchanged.</p>
+      </div>
+    </div>
+
+    <!-- ═══════════ PROBES ═══════════ -->
+    <div class="page" id="page-probes">
+      <div class="section-title">&#10084; Health Probes</div>
+
+      <div class="grid-2" style="margin-bottom:1.25rem">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title"><span class="status-dot loading" id="dot-liveness"></span>Liveness Probe</span>
+            <span class="endpoint-tag">GET /health</span>
+          </div>
+          <div class="data-row"><span class="data-label">Status</span><span class="data-value" id="probe-health-status">—</span></div>
+          <div class="data-row"><span class="data-label">HTTP Code</span><span class="data-value" id="probe-health-code">—</span></div>
+          <div class="data-row"><span class="data-label">Latency</span><span class="data-value" id="probe-health-ms">—</span></div>
+          <div style="margin-top:0.75rem;font-size:0.78rem;color:var(--muted);line-height:1.7">
+            <strong style="color:var(--text)">Liveness</strong> answers: "Is the process alive?"
+            If this fails, Kubernetes <strong style="color:var(--red)">restarts the container</strong>.
+            It should never do expensive work — just return 200 instantly.
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title"><span class="status-dot loading" id="dot-readiness"></span>Readiness Probe</span>
+            <span class="endpoint-tag">GET /ready</span>
+          </div>
+          <div class="data-row"><span class="data-label">Status</span><span class="data-value" id="probe-ready-status">—</span></div>
+          <div class="data-row"><span class="data-label">HTTP Code</span><span class="data-value" id="probe-ready-code">—</span></div>
+          <div class="data-row"><span class="data-label">Uptime</span><span class="data-value" id="probe-ready-uptime">—</span></div>
+          <div style="margin-top:0.75rem;font-size:0.78rem;color:var(--muted);line-height:1.7">
+            <strong style="color:var(--text)">Readiness</strong> answers: "Is the app ready to serve traffic?"
+            If this fails, Kubernetes <strong style="color:var(--yellow)">removes the pod from the Service</strong> (no restart).
+            Returns 503 for the first 2 seconds after startup.
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Liveness vs Readiness — when to use each</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;font-size:0.82rem">
+          <div>
+            <div style="color:var(--green);font-weight:600;margin-bottom:0.5rem">&#10003; Liveness (/health)</div>
+            <ul style="color:var(--muted);line-height:2;padding-left:1rem">
+              <li>App process is alive</li>
+              <li>Not deadlocked</li>
+              <li>Always fast (no DB check)</li>
+              <li>Failure → container restart</li>
+            </ul>
+          </div>
+          <div>
+            <div style="color:var(--blue);font-weight:600;margin-bottom:0.5rem">&#10003; Readiness (/ready)</div>
+            <ul style="color:var(--muted);line-height:2;padding-left:1rem">
+              <li>Warmed up and ready</li>
+              <li>Can check DB / cache</li>
+              <li>Failure → removed from LB</li>
+              <li>No restart on failure</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ CI/CD PIPELINE ═══════════ -->
+    <div class="page" id="page-pipeline">
+      <div class="section-title">&#9654; CI/CD Pipeline</div>
+
+      <div class="card span-full" style="margin-bottom:1.25rem">
+        <div class="card-header"><span class="card-title">GitHub Actions — 5 Stages</span></div>
+
+        <div class="pipeline">
+          <div class="pipeline-stage">
+            <div class="stage-dot done">&#10003;</div>
+            <div class="stage-name">test</div>
+            <div class="stage-detail">pytest + JUnit XML</div>
+          </div>
+          <div class="stage-line done"></div>
+          <div class="pipeline-stage">
+            <div class="stage-dot done">&#10003;</div>
+            <div class="stage-name">lint</div>
+            <div class="stage-detail">flake8 max-line=100</div>
+          </div>
+          <div class="stage-line done"></div>
+          <div class="pipeline-stage">
+            <div class="stage-dot done">&#10003;</div>
+            <div class="stage-name">build</div>
+            <div class="stage-detail">Docker Buildx → GHCR</div>
+          </div>
+          <div class="stage-line done"></div>
+          <div class="pipeline-stage">
+            <div class="stage-dot done">&#10003;</div>
+            <div class="stage-name">security-scan</div>
+            <div class="stage-detail">Trivy → SARIF</div>
+          </div>
+          <div class="stage-line done"></div>
+          <div class="pipeline-stage">
+            <div class="stage-dot done">&#10003;</div>
+            <div class="stage-name">deploy</div>
+            <div class="stage-detail">main-branch only</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Stage Details</span></div>
+          <div class="data-row"><span class="data-label">1. test</span><span class="data-value" style="font-size:0.78rem">pytest · JUnit XML artifact</span></div>
+          <div class="data-row"><span class="data-label">2. lint</span><span class="data-value" style="font-size:0.78rem">flake8 --max-line-length=100</span></div>
+          <div class="data-row"><span class="data-label">3. build</span><span class="data-value" style="font-size:0.78rem">Buildx → GHCR, tagged SHA</span></div>
+          <div class="data-row"><span class="data-label">4. security-scan</span><span class="data-value" style="font-size:0.78rem">Trivy image scan → SARIF</span></div>
+          <div class="data-row"><span class="data-label">5. deploy</span><span class="data-value" style="font-size:0.78rem">echo only (prod = kubectl)</span></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">What each stage does</span></div>
+          <div style="font-size:0.8rem;color:var(--muted);line-height:1.8">
+            Each job <strong style="color:var(--text)">needs:</strong> the previous — if tests fail, nothing builds.
+            The image is tagged with the short <strong style="color:var(--text)">git SHA</strong> so every build is traceable.
+            Trivy scans for CVEs and uploads a <strong style="color:var(--text)">SARIF report</strong> to GitHub Security tab.
+            Deploy only runs on <strong style="color:var(--text)">main branch</strong> pushes.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ ARCHITECTURE ═══════════ -->
+    <div class="page" id="page-architecture">
+      <div class="section-title">&#127760; System Architecture</div>
+
+      <div class="card span-full" style="margin-bottom:1.25rem">
+        <div class="card-header"><span class="card-title">Request Flow</span></div>
+        <div class="arch-flow">
+          <div class="arch-box"><div class="arch-icon">&#127760;</div><div class="arch-name">Browser</div><div class="arch-label">User</div></div>
+          <div class="arch-arrow">&#8594;</div>
+          <div class="arch-box"><div class="arch-icon">&#9654;</div><div class="arch-name">Nginx Ingress</div><div class="arch-label">K8s / TLS</div></div>
+          <div class="arch-arrow">&#8594;</div>
+          <div class="arch-box"><div class="arch-icon">&#9878;</div><div class="arch-name">Service</div><div class="arch-label">ClusterIP :5000</div></div>
+          <div class="arch-arrow">&#8594;</div>
+          <div class="arch-box"><div class="arch-icon">&#9881;</div><div class="arch-name">Flask Pod</div><div class="arch-label">2 replicas</div></div>
+          <div class="arch-arrow">&#8594;</div>
+          <div class="arch-box"><div class="arch-icon">&#128200;</div><div class="arch-name">Prometheus</div><div class="arch-label">scrapes /metrics</div></div>
+          <div class="arch-arrow">&#8594;</div>
+          <div class="arch-box"><div class="arch-icon">&#128202;</div><div class="arch-name">Grafana</div><div class="arch-label">dashboard</div></div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Infrastructure Layers</span></div>
+          <div class="data-row"><span class="data-label">App</span><span class="data-value">Flask + Gunicorn</span></div>
+          <div class="data-row"><span class="data-label">Container</span><span class="data-value">Docker (python:3.11-slim)</span></div>
+          <div class="data-row"><span class="data-label">Orchestration</span><span class="data-value">Kubernetes (2 replicas)</span></div>
+          <div class="data-row"><span class="data-label">IaC</span><span class="data-value">Terraform (docker provider)</span></div>
+          <div class="data-row"><span class="data-label">Monitoring</span><span class="data-value">Prometheus + Grafana</span></div>
+          <div class="data-row"><span class="data-label">CI/CD</span><span class="data-value">GitHub Actions</span></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><span class="card-title">Kubernetes Resources</span></div>
+          <div class="data-row"><span class="data-label">Namespace</span><span class="data-value">flask-app</span></div>
+          <div class="data-row"><span class="data-label">Replicas</span><span class="data-value">2 (HPA: 2–5)</span></div>
+          <div class="data-row"><span class="data-label">HPA CPU trigger</span><span class="data-value">70%</span></div>
+          <div class="data-row"><span class="data-label">HPA Memory trigger</span><span class="data-value">80%</span></div>
+          <div class="data-row"><span class="data-label">Ingress</span><span class="data-value">flask-app.example.com</span></div>
+          <div class="data-row"><span class="data-label">Probes</span><span class="data-value">liveness + readiness /health</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ EXPLANATION ═══════════ -->
+    <div class="page" id="page-explain">
+      <div class="section-title">&#128218; Project Explanation</div>
+
+      <div class="explain-block">
+        <h3>What is this project?</h3>
+        <p>A minimal <strong>Flask web application</strong> wired into a complete DevOps toolchain.
+        It demonstrates the full lifecycle of a production-grade service — from writing code,
+        to testing, containerising, scanning, deploying, and monitoring — all running <strong>locally</strong> with no cloud account required.</p>
+        <div class="tag-row">
+          <span class="tech-tag blue">Flask</span>
+          <span class="tech-tag green">Docker</span>
+          <span class="tech-tag purple">Kubernetes</span>
+          <span class="tech-tag orange">Terraform</span>
+          <span class="tech-tag blue">GitHub Actions</span>
+          <span class="tech-tag green">Prometheus</span>
+          <span class="tech-tag">Grafana</span>
+          <span class="tech-tag">Trivy</span>
+        </div>
+      </div>
+
+      <div class="explain-block">
+        <h3>The Flask App (app.py)</h3>
+        <p>Four routes: <code>/</code> returns a welcome message with version and environment.
+        <code>/health</code> is the liveness probe — returns <code>{"status":"ok"}</code>.
+        <code>/info</code> returns the hostname (useful in Kubernetes to see which pod responded).
+        <code>/metrics</code> is auto-instrumented by <code>prometheus-flask-exporter</code> — no manual metric code needed.</p>
+        <p style="margin-top:0.6rem">Version and environment are read from <code>APP_VERSION</code> and <code>APP_ENV</code> environment variables, so the same image works in dev, staging, and production just by changing env vars.</p>
+      </div>
+
+      <div class="explain-block">
+        <h3>Docker &amp; Multi-stage Build</h3>
+        <p>The Dockerfile uses a <strong>multi-stage build</strong> on <code>python:3.11-slim</code> to keep the image small.
+        The app runs as a <strong>non-root user</strong> for security. A <code>HEALTHCHECK</code> instruction tells Docker to poll
+        <code>/health</code> periodically — if it fails, Docker marks the container unhealthy and can restart it.</p>
+      </div>
+
+      <div class="explain-block">
+        <h3>Terraform (Infrastructure as Code)</h3>
+        <p>Uses the <code>kreuzwerker/docker</code> provider to provision a Docker container, named network, and volume — all locally.
+        Key variables like <code>app_name</code>, <code>container_port</code>, and <code>image_tag</code> are overridable at <code>terraform apply</code> time.
+        This means you can spin up or destroy the whole stack with one command.</p>
+      </div>
+
+      <div class="explain-block">
+        <h3>Kubernetes Manifests (k8s/)</h3>
+        <p>Production-ready manifests in the <code>flask-app</code> namespace. The <strong>Deployment</strong> runs 2 replicas with
+        resource requests/limits and both liveness and readiness probes. The <strong>HPA</strong> (Horizontal Pod Autoscaler)
+        scales from 2 to 5 pods when CPU exceeds 70% or memory exceeds 80%. A <strong>ClusterIP Service</strong> load-balances
+        across pods, and an <strong>Ingress</strong> exposes it via Nginx with a TLS placeholder.</p>
+      </div>
+
+      <div class="explain-block">
+        <h3>CI/CD Pipeline (GitHub Actions)</h3>
+        <p>Five sequential jobs — each <code>needs:</code> the previous so a failing test blocks the build.
+        The Docker image is pushed to GHCR tagged with the short git SHA, making every build traceable.
+        <strong>Trivy</strong> scans the image for CVEs and uploads a SARIF report to the GitHub Security tab.
+        The deploy job only runs on <code>main</code> branch pushes and is currently simulated (would be <code>kubectl set image</code> in production).</p>
+      </div>
+
+      <div class="explain-block">
+        <h3>Monitoring (Prometheus + Grafana)</h3>
+        <p>Prometheus scrapes <code>/metrics</code> every 15 seconds. Grafana connects to Prometheus at
+        <code>http://prometheus:9090</code>. Both run in a separate Compose file (<code>monitoring/docker-compose.monitoring.yml</code>)
+        so they're independent from the app stack. The recommended Grafana dashboard is ID <strong>11074</strong> (Flask Requests).
+        All metrics are auto-generated — request counts, durations, and Python process stats.</p>
+      </div>
+
+      <div class="explain-block">
+        <h3>Why no cloud required?</h3>
+        <p>Terraform uses a local Docker provider instead of AWS/GCP/Azure. Kubernetes manifests target a local cluster
+        (Docker Desktop, minikube, or kind). The monitoring stack runs in Docker Compose. GitHub Actions is the only
+        external dependency — and even that only runs when you push to GitHub. This design makes the project a
+        <strong>self-contained portfolio piece</strong> anyone can run on their laptop.</p>
+      </div>
+    </div>
+
+    <footer>Flask DevOps Pipeline &mdash; running locally &mdash; auto-refreshes every 10s</footer>
+  </div>
+</div>
+
+<script>
+  // ── State ──
+  const latencyHistory = [];
+  let totalRequests = 0;
+  const requestLog = [];
+  let remaining = 10;
+
+  // ── Navigation ──
+  function showPage(id, btn) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('page-' + id).classList.add('active');
+    btn.classList.add('active');
+    const titles = {
+      dashboard: 'Dashboard', endpoints: 'Endpoints', metrics: 'Metrics',
+      logs: 'Request Log', stats: 'Runtime Stats', env: 'Environment Variables',
+      echo: 'Echo Tester', probes: 'Health Probes',
+      pipeline: 'CI/CD Pipeline', architecture: 'Architecture', explain: 'Explanation'
+    };
+    document.getElementById('page-title').textContent = titles[id] || id;
+  }
+
+  // ── Fetch helpers ──
+  async function get(url) {
+    const t0 = performance.now();
+    const res = await fetch(url);
+    const ms = Math.round(performance.now() - t0);
+    let data = null;
+    const ct = res.headers.get('content-type') || '';
+    if (ct.includes('json')) data = await res.json();
+    else data = await res.text();
+    totalRequests++;
+    document.getElementById('stat-requests').textContent = totalRequests;
+    return { data, status: res.status, ms };
+  }
+
+  function logRequest(method, endpoint, status, ms, ok) {
+    const now = new Date().toLocaleTimeString();
+    requestLog.unshift({ method, endpoint, status, ms, ok, time: now });
+    if (requestLog.length > 50) requestLog.pop();
+    renderLog();
+  }
+
+  function renderLog() {
+    const tbody = document.getElementById('log-body');
+    if (!requestLog.length) return;
+    tbody.innerHTML = requestLog.map((r, i) => `
+      <tr>
+        <td>${requestLog.length - i}</td>
+        <td>${r.time}</td>
+        <td><span class="pill get">${r.method}</span></td>
+        <td>${r.endpoint}</td>
+        <td>${r.status}</td>
+        <td>${r.ms} ms</td>
+        <td><span class="pill ${r.ok ? 'ok' : 'error'}">${r.ok ? 'OK' : 'ERR'}</span></td>
+      </tr>`).join('');
+  }
+
+  function dot(id, state) {
+    const el = document.getElementById(id);
+    if (el) el.className = 'status-dot ' + state;
+  }
+
+  function set(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  }
+
+  // ── Fetch each endpoint ──
+  async function fetchHealth() {
+    dot('dot-health', 'loading'); dot('dot2-health', 'loading');
+    try {
+      const { data, status, ms } = await get('/health');
+      const ok = data.status === 'ok';
+      set('health-status', data.status);
+      set('health-code', status);
+      set('health-latency', ms + ' ms');
+      set('health-time', new Date().toLocaleTimeString());
+      set('ep-health-status', data.status);
+      set('ep-health-code', status);
+      set('ep-health-ms', ms + ' ms');
+      dot('dot-health', ok ? 'ok' : 'error');
+      dot('dot2-health', ok ? 'ok' : 'error');
+      latencyHistory.push(ms);
+      if (latencyHistory.length > 20) latencyHistory.shift();
+      drawChart();
+      updateAvgLatency();
+      logRequest('GET', '/health', status, ms, ok);
+    } catch {
+      dot('dot-health', 'error'); dot('dot2-health', 'error');
+      set('health-status', 'unreachable');
+      logRequest('GET', '/health', '—', '—', false);
+    }
+  }
+
+  async function fetchHome() {
+    dot('dot-home', 'loading'); dot('dot2-home', 'loading');
+    try {
+      const { data, status, ms } = await get('/');
+      set('home-message', data.message);
+      set('home-version', data.version);
+      set('home-env', data.environment);
+      set('ep-home-msg', data.message);
+      set('ep-home-ver', data.version);
+      set('ep-home-env', data.environment);
+      set('env-badge', data.environment);
+      set('version-badge', 'v' + data.version);
+      dot('dot-home', 'ok'); dot('dot2-home', 'ok');
+      logRequest('GET', '/', status, ms, true);
+    } catch {
+      dot('dot-home', 'error'); dot('dot2-home', 'error');
+      logRequest('GET', '/', '—', '—', false);
+    }
+  }
+
+  async function fetchInfo() {
+    dot('dot-info', 'loading'); dot('dot2-info', 'loading');
+    try {
+      const { data, status, ms } = await get('/info');
+      set('info-version', data.version);
+      set('info-hostname', data.hostname);
+      set('info-env', data.environment);
+      set('ep-info-ver', data.version);
+      set('ep-info-host', data.hostname);
+      set('ep-info-env', data.environment);
+      dot('dot-info', 'ok'); dot('dot2-info', 'ok');
+      logRequest('GET', '/info', status, ms, true);
+    } catch {
+      dot('dot-info', 'error'); dot('dot2-info', 'error');
+      logRequest('GET', '/info', '—', '—', false);
+    }
+  }
+
+  async function fetchMetrics() {
+    dot('dot-metrics', 'loading'); dot('dot2-metrics', 'loading');
+    try {
+      const { data: text, status, ms } = await get('/metrics');
+      const html = text
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .split('\n').map(line => {
+          if (line.startsWith('#')) return `<span class="m-comment">${line}</span>`;
+          const m = line.match(/^([a-z_]+)/);
+          if (m) {
+            const rest = line.slice(m[1].length);
+            const val = rest.match(/\s([\d.e+-]+)$/);
+            const restHtml = val
+              ? rest.slice(0, rest.length - val[1].length) + `<span class="m-value">${val[1]}</span>`
+              : rest;
+            return `<span class="m-name">${m[1]}</span>${restHtml}`;
+          }
+          return line;
+        }).join('\n');
+
+      ['ep-metrics', 'metrics-raw'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = html;
+      });
+
+      dot('dot-metrics', 'ok'); dot('dot2-metrics', 'ok');
+
+      // Parse request counts for metrics page
+      parseMetricsData(text);
+      logRequest('GET', '/metrics', status, ms, true);
+    } catch {
+      dot('dot-metrics', 'error'); dot('dot2-metrics', 'error');
+      logRequest('GET', '/metrics', '—', '—', false);
+    }
+  }
+
+  function parseMetricsData(text) {
+    const lines = text.split('\n').filter(l => !l.startsWith('#') && l.trim());
+
+    // Request count lines
+    const reqLines = lines.filter(l => l.startsWith('flask_http_request_total'));
+    const reqHtml = reqLines.length
+      ? reqLines.map(l => {
+          const ep = (l.match(/path="([^"]+)"/) || ['','?'])[1];
+          const val = l.split(' ').pop();
+          return `<div class="data-row"><span class="data-label">${ep}</span><span class="data-value">${val}</span></div>`;
+        }).join('')
+      : '<div class="data-row"><span class="data-label" style="color:var(--muted)">No request data yet</span></div>';
+
+    const reqEl = document.getElementById('req-count-list');
+    if (reqEl) reqEl.innerHTML = reqHtml;
+
+    // Process info
+    const procKeys = ['process_virtual_memory_bytes', 'process_resident_memory_bytes', 'process_open_fds', 'process_start_time_seconds'];
+    const procHtml = procKeys.map(k => {
+      const line = lines.find(l => l.startsWith(k + ' '));
+      if (!line) return '';
+      const val = parseFloat(line.split(' ').pop());
+      const label = k.replace('process_', '').replace(/_/g, ' ');
+      const display = k.includes('bytes') ? (val / 1024 / 1024).toFixed(1) + ' MB'
+                    : k.includes('time') ? new Date(val * 1000).toLocaleString()
+                    : val;
+      return `<div class="data-row"><span class="data-label">${label}</span><span class="data-value">${display}</span></div>`;
+    }).join('');
+
+    const procEl = document.getElementById('proc-info-list');
+    if (procEl) procEl.innerHTML = procHtml || '<div class="data-row"><span class="data-label" style="color:var(--muted)">Loading...</span></div>';
+  }
+
+  function updateAvgLatency() {
+    if (!latencyHistory.length) return;
+    const avg = Math.round(latencyHistory.reduce((a, b) => a + b, 0) / latencyHistory.length);
+    set('stat-latency', avg + ' ms');
+  }
+
+  // ── Mini bar chart (no external lib) ──
+  function drawChart() {
+    const canvas = document.getElementById('latencyChart');
+    if (!canvas || !latencyHistory.length) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.offsetWidth;
+    const H = 120;
+    canvas.width = W;
+    canvas.height = H;
+    ctx.clearRect(0, 0, W, H);
+
+    const max = Math.max(...latencyHistory, 10);
+    const n = latencyHistory.length;
+    const barW = Math.max(4, (W / n) - 3);
+    const gap = (W - barW * n) / (n + 1);
+
+    latencyHistory.forEach((v, i) => {
+      const barH = Math.max(4, (v / max) * (H - 20));
+      const x = gap + i * (barW + gap);
+      const y = H - barH - 5;
+      const alpha = 0.4 + 0.6 * ((i + 1) / n);
+      ctx.fillStyle = `rgba(56,189,248,${alpha})`;
+      ctx.beginPath();
+      ctx.roundRect(x, y, barW, barH, 3);
+      ctx.fill();
+
+      if (i === n - 1) {
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = '10px monospace';
+        ctx.fillText(v + 'ms', x, y - 4);
+      }
+    });
+
+    // baseline
+    ctx.strokeStyle = '#1f2d40';
+    ctx.beginPath();
+    ctx.moveTo(0, H - 5); ctx.lineTo(W, H - 5);
+    ctx.stroke();
+  }
+
+  // ── Stats ──
+  async function fetchStats() {
+    try {
+      const { data } = await get('/api/stats');
+      set('stat-uptime-human', data.uptime_human);
+      set('stat-start-time', 'started: ' + data.start_time);
+      set('stat-reqs-total', data.requests_total);
+      set('stat-python', data.python_version);
+      set('stat-hostname-tile', 'host: ' + data.hostname);
+
+      const keys = ['uptime_seconds','uptime_human','start_time','requests_total','hostname','version','environment','python_version'];
+      const labels = {
+        uptime_seconds: 'Uptime (seconds)', uptime_human: 'Uptime', start_time: 'Start Time',
+        requests_total: 'Requests Total', hostname: 'Hostname', version: 'Version',
+        environment: 'Environment', python_version: 'Python'
+      };
+      const el = document.getElementById('stats-rows');
+      if (el) el.innerHTML = keys.map(k =>
+        `<div class="data-row"><span class="data-label">${labels[k]||k}</span><span class="data-value">${data[k]}</span></div>`
+      ).join('');
+    } catch(e) { console.error('stats', e); }
+  }
+
+  // ── Env Vars ──
+  async function fetchEnv() {
+    try {
+      const { data } = await get('/api/env');
+      const badge = document.getElementById('env-count-badge');
+      if (badge) badge.textContent = data.count + ' vars';
+      const el = document.getElementById('env-rows');
+      if (!el) return;
+      const vars = data.variables;
+      const keys = Object.keys(vars).sort();
+      if (!keys.length) {
+        el.innerHTML = '<div style="color:var(--muted);padding:0.5rem 0">No safe env vars found</div>';
+        return;
+      }
+      el.innerHTML = keys.map(k =>
+        `<div class="data-row">
+          <span class="data-label" style="font-family:monospace">${k}</span>
+          <span class="data-value" style="max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${vars[k]}">${vars[k]}</span>
+        </div>`
+      ).join('');
+    } catch(e) { console.error('env', e); }
+  }
+
+  // ── Echo ──
+  async function sendEcho() {
+    const input = document.getElementById('echo-input').value;
+    const statusEl = document.getElementById('echo-status');
+    const respEl = document.getElementById('echo-response');
+    let payload;
+    try {
+      payload = JSON.parse(input);
+    } catch {
+      statusEl.textContent = '✗ Invalid JSON';
+      statusEl.style.color = 'var(--red)';
+      return;
+    }
+    statusEl.textContent = 'Sending...';
+    statusEl.style.color = 'var(--yellow)';
+    try {
+      const t0 = performance.now();
+      const res = await fetch('/api/echo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const ms = Math.round(performance.now() - t0);
+      const data = await res.json();
+      totalRequests++;
+      set('stat-requests', totalRequests);
+      statusEl.textContent = `✓ ${res.status} in ${ms}ms`;
+      statusEl.style.color = 'var(--green)';
+      logRequest('POST', '/api/echo', res.status, ms, res.ok);
+      respEl.style.cssText = 'height:200px;overflow-y:auto;display:block';
+      respEl.innerHTML = JSON.stringify(data, null, 2)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/"([^"]+)":/g, '<span style="color:var(--blue)">"$1"</span>:')
+        .replace(/: "([^"]+)"/g, ': <span style="color:var(--green)">"$1"</span>')
+        .replace(/: (\d+)/g, ': <span style="color:var(--yellow)">$1</span>');
+    } catch {
+      statusEl.textContent = '✗ Request failed';
+      statusEl.style.color = 'var(--red)';
+    }
+  }
+
+  function resetEcho() {
+    document.getElementById('echo-input').value = '{\n  "message": "hello",\n  "value": 42\n}';
+    document.getElementById('echo-status').textContent = '';
+    const r = document.getElementById('echo-response');
+    r.innerHTML = 'Send a payload to see the echo response';
+    r.style.cssText = 'height:200px;display:flex;align-items:center;justify-content:center;color:var(--muted)';
+  }
+
+  // ── Probes ──
+  async function fetchProbes() {
+    // Liveness
+    try {
+      const { data, status, ms } = await get('/health');
+      set('probe-health-status', data.status);
+      set('probe-health-code', status);
+      set('probe-health-ms', ms + ' ms');
+      dot('dot-liveness', data.status === 'ok' ? 'ok' : 'error');
+    } catch {
+      dot('dot-liveness', 'error');
+    }
+    // Readiness
+    try {
+      const { data, status, ms } = await get('/ready');
+      set('probe-ready-status', data.status);
+      set('probe-ready-code', status);
+      set('probe-ready-uptime', data.uptime_seconds + 's');
+      dot('dot-readiness', status === 200 || status === '200' ? 'ok' : 'error');
+    } catch {
+      dot('dot-readiness', 'error');
+    }
+  }
+
+  function fetchAll() {
+    fetchHealth();
+    fetchHome();
+    fetchInfo();
+    fetchMetrics();
+    fetchStats();
+    fetchEnv();
+    fetchProbes();
+  }
+
+  // ── Countdown ──
+  function tick() {
+    set('countdown', `Refresh in ${remaining}s`);
+    remaining--;
+    if (remaining < 0) { remaining = 10; fetchAll(); }
+  }
+
+  fetchAll();
+  tick();
+  setInterval(tick, 1000);
+  window.addEventListener('resize', drawChart);
+</script>
+</body>
+</html>
